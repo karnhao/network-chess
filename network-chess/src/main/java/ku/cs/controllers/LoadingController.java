@@ -1,5 +1,7 @@
 package ku.cs.controllers;
 
+import javafx.scene.control.Button;
+import javafx.scene.control.TextField;
 import ku.cs.net.Client;
 import ku.cs.services.LoadService;
 import ku.cs.services.ProgressSetter;
@@ -18,7 +20,6 @@ import javafx.scene.text.Font;
 import javafx.scene.transform.Rotate;
 import javafx.util.Duration;
 
-import java.io.IOException;
 import java.net.URL;
 
 public class LoadingController {
@@ -30,9 +31,16 @@ public class LoadingController {
     public Label descriptionLabel;
     @FXML
     public ImageView loadIcon;
+    @FXML
+    public Button retryButton;
+    @FXML
+    public TextField ipTextField;
+    @FXML
+    public TextField portTextField;
 
     @FXML
     public void initialize() {
+        retryButton.setVisible(false);
         URL url = getClass().getResource("/ku/cs/images/ku_logo.png");
         if (url != null) {
             loadIcon.setImage(new Image(url.toExternalForm()));
@@ -57,7 +65,7 @@ public class LoadingController {
             Font.loadFont(getClass().getResourceAsStream("/ku/cs/fonts/DB Ozone X Bd v3.2.ttf"), 20);
             Data data = Data.getInstance();
 
-            // Fake Loading
+            // Make loading look smoother
             ProgressSetter progressSetter = new ProgressSetter(100);
             LoadService.getLoader().addProgressSetter(progressSetter);
 
@@ -72,12 +80,17 @@ public class LoadingController {
                 }
             }
             try {
-                Client.init("127.0.0.1", (short) 25565);
-            } catch (IOException e) {
-                Platform.runLater(() -> descriptionLabel.setText(e.getMessage()));
-
+                Client.init(ipTextField.getText(), Short.parseShort(portTextField.getText()));
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    descriptionLabel.setText(e.getMessage());
+                    retryButton.setVisible(true);
+                    LoadService.getLoader().close();
+                    Client.close();
+                });
                 throw new RuntimeException(e);
             }
+
             for (int i = 50; i < n; i++) {
                 progressSetter.setPercentage((double) i / n);
                 LoadService.getLoader().updateBar();
@@ -87,10 +100,16 @@ public class LoadingController {
                     e.printStackTrace();
                 }
             }
+            BoardCellController.loadImageResource(); // load pieces image into visual memory
 
             RootService.getController().setData(data);
             LoadService.getLoader().close();
             Platform.runLater(() -> RootService.open("mainGameScreen.fxml"));
         }).start();
+    }
+
+    public void onRetryButtonPress() {
+        startLoading();
+        retryButton.setVisible(false);
     }
 }

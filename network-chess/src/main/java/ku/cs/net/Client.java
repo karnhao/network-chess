@@ -1,41 +1,182 @@
 package ku.cs.net;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
+import ku.cs.controllers.BoardController;
+import ku.cs.services.RootService;
 
-public class Client {
+import javax.crypto.Cipher;
+import java.io.*;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+
+public class Client extends Thread {
     private static Client client = null;
 
-    private final Socket socket;
-    private final PrintWriter out;
-    private final BufferedReader in;
+    private Socket socket;
+    private ObjectOutputStream out;
+    private ObjectInputStream in;
 
-    public static void init(String ip, short port) throws IOException {
+    private String latestData;
+    private final String serverIp;
+    private final short serverPort;
+    private String accessToken;
+
+    private BoardController boardController = null;
+    private PublicKey serverPublicKey;
+    private PublicKey clientPublickey;
+    private PrivateKey clientPrivateKey;
+
+    public static void init(String ip, short port) throws IOException, ClassNotFoundException {
         if (client != null) return;
-        Client.client = new Client(ip, port);
-    }
 
-    public static void close() throws IOException {
-        if (client == null) return;
-        System.out.println("Closing Connection...");
-        client.closeConnection();
-    }
-    public void closeConnection() throws IOException {
+        Socket socket = new Socket(ip, port);
+        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+        ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+
+        out.writeObject("init");
+        out.flush();
+
+        String text = (String) in.readObject();
+        System.out.println(text);
+
+        PublicKey clientPublicKey = null;
+        PrivateKey clientPrivateKey = null;
+        PublicKey serverPublicKey = (PublicKey) in.readObject();
+        System.out.println(serverPublicKey);
+        String token = null;
+        if (text.split(" ")[0].equalsIgnoreCase("player")) {
+
+            // Generate Key pair
+            System.out.println("Generating Client Key");
+            try {
+                KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+                keyPairGenerator.initialize(512);
+
+                KeyPair keyPair = keyPairGenerator.generateKeyPair();
+                clientPublicKey = keyPair.getPublic();
+                clientPrivateKey = keyPair.getPrivate();
+
+                System.out.println("Public Key: " + clientPublicKey);
+                System.out.println("Private Key: " + clientPrivateKey);
+
+                Cipher cipher = Cipher.getInstance("RSA");
+                cipher.init(Cipher.ENCRYPT_MODE, serverPublicKey);
+
+                out.writeObject(cipher.doFinal(clientPublicKey.getEncoded()));
+                out.flush();
+
+                cipher.init(Cipher.DECRYPT_MODE, clientPrivateKey);
+                System.out.println("Decrypting Access Token...");
+                token = new String(cipher.doFinal((byte[]) in.readObject()), StandardCharsets.UTF_8);
+                System.out.println("Access Token = " + token);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        } // else viewer
+
+
         in.close();
         out.close();
         socket.close();
+
+        if (Client.client == null) {
+            Client.client = new Client(ip, port);
+            Client.client.accessToken = token;
+            Client.client.serverPublicKey = serverPublicKey;
+            Client.client.clientPublickey = clientPublicKey;
+            Client.client.clientPrivateKey = clientPrivateKey;
+        }
     }
 
-    private Client(String ip, short port) throws IOException {
-        socket = new Socket(ip, port);
-        out = new PrintWriter(socket.getOutputStream(), true);
-        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    public static void close() {
+        if (client == null) return;
+        System.out.println("Closing Connection...");
+        client.closeConnection();
+        client.interrupt();
+    }
+    public void closeConnection() {
+        try {
+            in.close();
+            out.close();
+            socket.close();
+        } catch (Exception ignored) {}
+    }
 
-        out.println("init");
+    public static Client getClient() {
+        return client;
+    }
 
-        System.out.println(in.readLine());
+    private Client(String ip, short port) {
+        this.serverIp = ip;
+        this.serverPort = port;
+        this.start();
+    }
+
+    public String getLatestData() {
+        return latestData;
+    }
+
+    @Override
+    public void run() {
+        System.out.println("Client Thread Start");
+        while(true) {
+            if (Thread.interrupted()) break;
+            try {
+
+                socket = new Socket(this.serverIp, this.serverPort);
+                out = new ObjectOutputStream(socket.getOutputStream());
+                in = new ObjectInputStream(socket.getInputStream());
+
+                out.writeObject("update");
+                this.latestData = (String) in.readObject();
+                this.closeConnection();
+                System.out.println(this.latestData);
+                System.out.println("Update Since " + System.currentTimeMillis());
+
+                if (this.boardController != null) boardController.update(this.latestData);
+
+                Thread.sleep(500);
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+                this.closeConnection();
+                break;
+            } catch (InterruptedException e) {
+                this.closeConnection();
+                break;
+            }
+        }
+    }
+
+    public void setBoardController(BoardController boardController) {
+        this.boardController = boardController;
+    }
+
+    public void move(int fromX, int fromY, int toX, int toY) {
+        try (Socket moveSocket = new Socket(this.serverIp, this.serverPort)) {
+            ObjectOutputStream out = new ObjectOutputStream(moveSocket.getOutputStream());
+            ObjectInputStream in = new ObjectInputStream(moveSocket.getInputStream());
+
+            Cipher cipher = Cipher.getInstance("RSA");
+            cipher.init(Cipher.ENCRYPT_MODE, this.serverPublicKey);
+
+
+
+            out.writeObject(String.format("move %d %d %d %d", fromX, fromY, toX, toY));
+            out.writeObject(cipher.doFinal(this.accessToken.getBytes()));
+            out.flush();
+
+            String outputMessage = (String) in.readObject();
+            System.out.println(outputMessage);
+            RootService.showBar(outputMessage);
+        } catch (ClassNotFoundException e) {
+            RootService.showErrorBar(e.getClass().getSimpleName() + " " + e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            RootService.showErrorBar(e.getMessage());
+        }
     }
 }

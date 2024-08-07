@@ -32,7 +32,7 @@ public class MainApp extends Application {
 
     private static void configRoute() {
         String resourcesPath = "ku/cs/views/";
-        FXRouter.when("root", resourcesPath + "root.fxml", "CS211 Project", MIN_WIGHT, 760);
+        FXRouter.when("root", resourcesPath + "root.fxml", "Network - Application", MIN_WIGHT, 760);
     }
 
     /**
@@ -75,10 +75,7 @@ public class MainApp extends Application {
 
     @Override
     public void stop() {
-        try {
-            Client.close();
-        } catch (IOException ignored) {
-        }
+        Client.close();
     }
 
 }

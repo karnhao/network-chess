@@ -2,6 +2,9 @@ package ku.cs;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 
 public class ClientHandler extends AbstractClientHandler {
 
@@ -11,13 +14,37 @@ public class ClientHandler extends AbstractClientHandler {
 
     public void run() {
         try {
-            String text;
-            while ((text = reader.readLine()) != null) {
-                System.out.println("Received: " + text);
-                writer.println("Echo: " + text);
-            }
+            LocalDateTime dateTime = LocalDateTime.now();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+            String[] args = ((String) reader.readObject()).split(" ");
+            System.out.println(dateTime.format(formatter) + " Received: " + Arrays.toString(args));
+            switch (args[0]) {
+                case "init":
+                    ClientInitHandler clientJoinHandler = new ClientInitHandler(this);
+                    clientJoinHandler.start();
+                    clientJoinHandler.join();
+                    break;
+                case "move":
+                    ClientMoveHandler clientMoveHandler = new ClientMoveHandler(this, args);
+                    clientMoveHandler.start();
+                    clientMoveHandler.join();
+                    break;
+                case "update":
+                    ClientUpdateHandler clientUpdateHandler = new ClientUpdateHandler(this);
+                    clientUpdateHandler.start();
+                    clientUpdateHandler.join();
+                    break;
+                default:
+                    break;
+        }
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            try {
+                close(); // CLOSE CONNECTION!
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
