@@ -31,6 +31,7 @@ public class Board {
      * @param position
      */
     public void set(Piece piece, Pos position) {
+        System.out.println("set piece " + piece + " " + position);
         set(piece, position.getX(), position.getY());
     }
 
@@ -130,9 +131,9 @@ public class Board {
                 throw new IllegalMoveException("Cannot eat at " + destinationPos.toString());
         }
 
-        sourcePiece.onMove(sourcePos, destinationPos);
         this.set(sourcePiece, destinationPos);
         this.set(null, sourcePos);
+        sourcePiece.onMove(sourcePos, destinationPos);
     }
 
     public boolean isSquareUnderAttack(byte x, byte y, PieceFaction attacker) {

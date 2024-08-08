@@ -12,6 +12,7 @@ public class ClientUpdateHandler  extends AbstractClientHandler{
     public void run() {
         try {
             writer.writeObject(Server.getGame().getClientsGameState());
+            writer.writeObject(Server.getGame().getCurrentFactionTurn().name());
             writer.flush();
         } catch (IOException e) {
             e.printStackTrace();

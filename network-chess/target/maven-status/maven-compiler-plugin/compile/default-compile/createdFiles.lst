@@ -13,11 +13,12 @@ ku\cs\chessNetwork\MainApp.class
 ku\cs\controllers\FXMLController.class
 ku\cs\services\Data.class
 ku\cs\services\LoadService$Loader.class
+ku\cs\utils\TimeString.class
 module-info.class
 ku\cs\services\RootService.class
 ku\cs\controllers\RootController$Color.class
-ku\cs\controllers\MainGameScreen.class
 ku\cs\services\FXRouter$RouteScene.class
 ku\cs\controllers\BoardCellController.class
 ku\cs\services\LoadService.class
+ku\cs\controllers\MainGameScreenController.class
 ku\cs\services\ProgressSetter.class

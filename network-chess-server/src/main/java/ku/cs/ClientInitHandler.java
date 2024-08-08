@@ -27,7 +27,7 @@ public class ClientInitHandler extends AbstractClientHandler {
     }
 
     @Override
-    public void run() {
+    synchronized public void run() {
         try {
             String role = Server.getGame().isAcceptPlayer() ? "player" : "viewer";
             writer.writeObject(role);
@@ -57,12 +57,14 @@ public class ClientInitHandler extends AbstractClientHandler {
                 byte[] encryptedToken = cipher.doFinal(accessToken.getBytes());
     
                 writer.writeObject(encryptedToken);
-                writer.flush();
 
                 // Add player to the game
                 Player player = new Player();
                 player.setAccessToken(accessToken);
                 Server.getGame().addPlayer(player);
+
+                writer.writeObject(player.getOwnFaction().name().toLowerCase());
+                writer.flush();
             }
 
             

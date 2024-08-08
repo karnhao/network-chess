@@ -1,7 +1,10 @@
 package ku.cs.net;
 
+import javafx.application.Platform;
 import ku.cs.controllers.BoardController;
+import ku.cs.controllers.MainGameScreenController;
 import ku.cs.services.RootService;
+import ku.cs.utils.TimeString;
 
 import javax.crypto.Cipher;
 import java.io.*;
@@ -28,6 +31,8 @@ public class Client extends Thread {
     private PublicKey serverPublicKey;
     private PublicKey clientPublickey;
     private PrivateKey clientPrivateKey;
+    private MainGameScreenController gameController;
+    private String faction;
 
     public static void init(String ip, short port) throws IOException, ClassNotFoundException {
         if (client != null) return;
@@ -47,6 +52,7 @@ public class Client extends Thread {
         PublicKey serverPublicKey = (PublicKey) in.readObject();
         System.out.println(serverPublicKey);
         String token = null;
+        String faction = "";
         if (text.split(" ")[0].equalsIgnoreCase("player")) {
 
             // Generate Key pair
@@ -72,6 +78,10 @@ public class Client extends Thread {
                 System.out.println("Decrypting Access Token...");
                 token = new String(cipher.doFinal((byte[]) in.readObject()), StandardCharsets.UTF_8);
                 System.out.println("Access Token = " + token);
+
+                faction = (String) in.readObject();
+                System.out.println("Faction = " + faction);
+
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -89,6 +99,7 @@ public class Client extends Thread {
             Client.client.serverPublicKey = serverPublicKey;
             Client.client.clientPublickey = clientPublicKey;
             Client.client.clientPrivateKey = clientPrivateKey;
+            Client.client.faction = faction;
         }
     }
 
@@ -133,13 +144,15 @@ public class Client extends Thread {
 
                 out.writeObject("update");
                 this.latestData = (String) in.readObject();
+                String toMove = (String) in.readObject();
+
                 this.closeConnection();
                 System.out.println(this.latestData);
-                System.out.println("Update Since " + System.currentTimeMillis());
+                System.out.println("Update Since " + TimeString.getCurrentTimeString());
 
-                if (this.boardController != null) boardController.update(this.latestData);
+                Platform.runLater(() -> this.updateUIController(this.latestData, toMove));
 
-                Thread.sleep(500);
+                Thread.sleep(100);
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
                 this.closeConnection();
@@ -163,20 +176,35 @@ public class Client extends Thread {
             Cipher cipher = Cipher.getInstance("RSA");
             cipher.init(Cipher.ENCRYPT_MODE, this.serverPublicKey);
 
+            String sendMessage = String.format("move %d %d %d %d", fromX, fromY, toX, toY);
 
-
-            out.writeObject(String.format("move %d %d %d %d", fromX, fromY, toX, toY));
+            out.writeObject(sendMessage);
             out.writeObject(cipher.doFinal(this.accessToken.getBytes()));
             out.flush();
 
             String outputMessage = (String) in.readObject();
             System.out.println(outputMessage);
             RootService.showBar(outputMessage);
+            this.gameController.addTextAreaText("Send : " + sendMessage);
+            this.gameController.addTextAreaText("Response Message : " + outputMessage);
         } catch (ClassNotFoundException e) {
             RootService.showErrorBar(e.getClass().getSimpleName() + " " + e.getMessage());
+            this.gameController.addTextAreaText("Error : " + e.getClass().getSimpleName() + " " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
-            RootService.showErrorBar(e.getMessage());
         }
+    }
+
+    public void setGameController(MainGameScreenController mainGameScreenController) {
+        this.gameController = mainGameScreenController;
+    }
+
+    private void updateUIController(String chessData, String toMove) {
+        if (this.boardController != null) this.boardController.update(chessData);
+        if (this.gameController != null) {
+            this.gameController.setTurnLabelText(toMove + " to move.");
+            this.gameController.setPlayerFaction(this.faction);
+        }
+
     }
 }

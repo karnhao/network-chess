@@ -54,6 +54,10 @@ public class Game {
         return this.board.getPieceString();
     }
 
+    public PieceFaction getCurrentFactionTurn() {
+        return this.currentPlayerTurn == 0 ? PieceFaction.BLACK : PieceFaction.WHITE;
+    }
+
     public boolean isAcceptPlayer() {
         return this.players[0] == null || this.players[1] == null;
     }

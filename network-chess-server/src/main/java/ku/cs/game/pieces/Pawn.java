@@ -34,6 +34,10 @@ public class Pawn extends Piece {
     @Override
     public void onMove(Pos oldPos, Pos newPos) {
         this.isMoved = true;
+        if (newPos.getY() == ((direction == 1) ? 7 : 0)) {
+            this.getBoard().set(new Queen(this.getBoard(), this.getFaction()), newPos); // Promote to queen
+        }
+        
     }
     
 }
